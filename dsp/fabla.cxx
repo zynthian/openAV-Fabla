@@ -81,6 +81,7 @@ typedef struct {
   
   // port values
   float* master;
+  float* base_note
   float w, a, b, g1, g2; // smoothing variables
   
   float* output_L;
@@ -93,7 +94,7 @@ typedef struct {
   float* comp_makeup;
   float* comp_enable;
   
-  PadData padData[16];
+  PadData padData[NPADS];
   
   // URID map
   LV2_URID_Map* map;
@@ -120,7 +121,7 @@ typedef struct {
   float  speed;  // Transport speed (usually 0=stop, 1=play)
   
   Voice* voice[NVOICES];
-  Sample* samples[16];
+  Sample* samples[NPADS];
   Compressor* comp;
   
   // UI related stuff
@@ -216,7 +217,7 @@ instantiate(const LV2_Descriptor*     descriptor,
   FABLA_DSP* self = (FABLA_DSP*)calloc(1, sizeof(FABLA_DSP));
   self->uris  = (Fabla_URIs*)calloc(1, sizeof(Fabla_URIs));
   
-  for(int i = 0; i < 16; i++ )
+  for(int i = 0; i < NPADS; i++ )
     self->samples[i] = 0;
   
   self->sr  = rate;
@@ -281,7 +282,7 @@ connect_port(LV2_Handle instance,
 {
   FABLA_DSP* self = (FABLA_DSP*)instance;
   
-  switch ((PortIndex)port)
+  switch (port)
   {
     case ATOM_IN:
       self->control_port = (LV2_Atom_Sequence*)data; break;
@@ -295,6 +296,8 @@ connect_port(LV2_Handle instance,
     
     case MASTER_VOL:
       self->master = (float*)data; break;
+    case BASE_NOTE:
+      self->base_note = (float*)data; break;
     
     case COMP_ATTACK:
       self->comp_attack = (float*)data; break;
@@ -309,55 +312,41 @@ connect_port(LV2_Handle instance,
     case COMP_ENABLE:
       self->comp_enable = (float*)data; break;
     
-    // deal with 16 * ADSR / gain / speed / pan here
-    case PAD_GAIN:
-    case pg2: case pg3: case pg4: case pg5: case pg6: case pg7: case pg8: case pg9:
-    case pg10: case pg11: case pg12: case pg13: case pg14: case pg15: case pg16:
-        // hack the enum to access the right array slice
+    // deal with NPADS * (ADSR, gain, speed, pan) here
+    case PAD_GAIN ... PAD_GAIN + NPADS - 1:
+		// hack the enum to access the right array slice
         self->padData[ port - int(PAD_GAIN) ].gain = (float*)data;
         //printf("Gain Pad %i, port num %i\n", port - int(PAD_GAIN), port);
         break;
     
-    case PAD_SPEED:
-    case pspd2: case pspd3: case pspd4: case pspd5: case pspd6: case pspd7: case pspd8: case pspd9:
-    case pspd10: case pspd11: case pspd12: case pspd13: case pspd14: case pspd15: case pspd16:
+    case PAD_SPEED ... PAD_SPEED + NPADS - 1:
         // hack the enum to access the right array slice
         self->padData[ port - int(PAD_SPEED) ].speed = (float*)data;
         //printf("Speed: Pad %i\n", port);
         break;
     
-    case PAD_PAN:
-    case pp2: case pp3: case pp4: case pp5: case pp6: case pp7: case pp8: case pp9:
-    case pp10: case pp11: case pp12: case pp13: case pp14: case pp15: case pp16:
+    case PAD_PAN ... PAD_PAN + NPADS - 1:
         // hack the enum to access the right array slice
         self->padData[ port - int(PAD_PAN) ].pan = (float*)data;
         break;
     
     // ADSR
-    case PAD_ATTACK:
-    case pa2: case pa3: case pa4: case pa5: case pa6: case pa7: case pa8: case pa9:
-    case pa10: case pa11: case pa12: case pa13: case pa14: case pa15: case pa16:
+    case PAD_ATTACK ... PAD_ATTACK + NPADS - 1:
         // hack the enum to access the right array slice
         self->padData[ port - int(PAD_ATTACK) ].a = (float*)data;
         break;
     
-    case PAD_DECAY:
-    case pd2: case pd3: case pd4: case pd5: case pd6: case pd7: case pd8: case pd9:
-    case pd10: case pd11: case pd12: case pd13: case pd14: case pd15: case pd16:
+    case PAD_DECAY ... PAD_DECAY + NPADS - 1:
         // hack the enum to access the right array slice
         self->padData[ port - int(PAD_DECAY) ].d = (float*)data;
         break;
     
-    case PAD_SUSTAIN:
-    case ps2: case ps3: case ps4: case ps5: case ps6: case ps7: case ps8: case ps9:
-    case ps10: case ps11: case ps12: case ps13: case ps14: case ps15: case ps16:
+    case PAD_SUSTAIN ... PAD_SUSTAIN + NPADS - 1:
         // hack the enum to access the right array slice
         self->padData[ port - int(PAD_SUSTAIN) ].s = (float*)data;
         break;
     
-    case PAD_RELEASE:
-    case pr2: case pr3: case pr4: case pr5: case pr6: case pr7: case pr8: case pr9:
-    case pr10: case pr11: case pr12: case pr13: case pr14: case pr15: case pr16:
+    case PAD_RELEASE ... PAD_RELEASE + NPADS - 1:
         // hack the enum to access the right array slice
         self->padData[ port - int(PAD_RELEASE) ].r = (float*)data;
         break;
@@ -369,8 +358,8 @@ connect_port(LV2_Handle instance,
 
 static void noteOn(FABLA_DSP* self, int note, int velocity, int frame)
 {
-  // clip MIDI input, only play 16 samples
-  if ( note > 15) note = 15;
+  // clip MIDI input, only play NPADS samples
+  if ( note >= NPADS) note = NPADS - 1;
   if ( note <  0) note =  0;
   
   if ( !self->samples[note] )
@@ -519,14 +508,16 @@ run(LV2_Handle instance, uint32_t n_samples)
   
   float* const       outputL = self->output_L;
   float* const       outputR = self->output_R;
-  
+
+  // base MIDI note
+  int base_note = (int)*(self->base_note)
+
   // zero output buffer
   memset ( outputL, 0, n_samples );
   memset ( outputR, 0, n_samples );
   
-  
   // loop over the pads, setting control port values
-  for(int i = 0; i < 16; i++)
+  for(int i = 0; i < NPADS; i++)
   {
     if ( self->samples[i] )
     {
@@ -566,7 +557,7 @@ run(LV2_Handle instance, uint32_t n_samples)
         lv2_atom_forge_pop(&self->forge, &set_frame);
         
         // use next available voice for the note
-        int n = int(data[1]) - 36;
+        int n = int(data[1]) - base_note;
         int v = int(data[2]);
         
         noteOn( self, n, v, ev->time.frames );
@@ -591,7 +582,7 @@ run(LV2_Handle instance, uint32_t n_samples)
         lv2_atom_forge_pop(&self->forge, &body_frame);
         lv2_atom_forge_pop(&self->forge, &set_frame);
         
-        int n = int(data[1]) - 36;
+        int n = int(data[1]) - base_note;
 
         noteOff( self, n, ev->time.frames );
       }
@@ -663,10 +654,10 @@ run(LV2_Handle instance, uint32_t n_samples)
         {
           // Get pad number
           int pad = 0;
-          for (;pad < 16; pad++) {
+          for (;pad < NPADS; pad++) {
             if (((const LV2_Atom_URID*)property)->body == self->uris->padFpath[pad]) break;
           }
-          if (pad < 16)  write_pad_fpath(self, pad);
+          if (pad < NPADS)  write_pad_fpath(self, pad);
         }
       }
       else if (obj->body.otype == self->uris->patch_Set)
@@ -681,10 +672,10 @@ run(LV2_Handle instance, uint32_t n_samples)
         {
           // Get pad number
           int pad = 0;
-          for (;pad < 16; pad++) {
+          for (;pad < NPADS; pad++) {
             if (((const LV2_Atom_URID*)property)->body == self->uris->padFpath[pad]) break;
           }
-          if (pad < 16)
+          if (pad < NPADS)
           {
             const char *f = (const char *) (file_path + 1);
             //printf("RECEIVED filepath for PAD %d => %s", pad, f);
@@ -969,7 +960,7 @@ save(LV2_Handle                instance,
   
   // loop over samples, if loaded save its state in the dictionary using
   // the custom URI's created in uris.hxx
-  for ( int i = 0; i < 16; i++ )
+  for ( int i = 0; i < NPADS; i++ )
   {
     if ( self->samples[i] && self->samples[i]->path )
     {
@@ -1010,7 +1001,7 @@ restore(LV2_Handle                  instance,
   uint32_t type;
   uint32_t valflags;
   
-  for ( int i = 0; i < 16; i++ )
+  for ( int i = 0; i < NPADS; i++ )
   {
     const void* value = retrieve( handle, self->uris->padFilename[i], &size, &type, &valflags);
     if (value)
