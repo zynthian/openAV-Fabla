@@ -501,7 +501,7 @@ else
   }
   decl {LV2UI_Write_Function writeFunction} {public local
   }
-  decl {UIPadData padData[16];} {
+  decl {UIPadData padData[NPADS];} {
     comment {holds all pad individual data} public local
   }
   Function {close_cb(Fl_Widget* o, void*)} {open

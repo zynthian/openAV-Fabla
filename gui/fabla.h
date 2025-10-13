@@ -182,15 +182,18 @@ private:
 public:
   Fabla* fabla; 
   void idle();
+  unsigned int baseNote;
+  void select_page(int p);
+  unsigned int selectedPage;
   void select_pad(int p);
-  int selectedPad; 
+  unsigned int selectedPad;
   void pad_click(int id, int rclick);
   LV2UI_Controller controller; 
   LV2UI_Write_Function writeFunction; 
   /**
      holds all pad individual data
   */
-  UIPadData padData[16]; 
+  UIPadData padData[NPADS];
   void close_cb(Fl_Widget* o, void*);
   std::string lastUsedPath;
 };

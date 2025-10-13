@@ -81,7 +81,7 @@ typedef struct {
   
   // port values
   float* master;
-  float* base_note
+  float* base_note;
   float w, a, b, g1, g2; // smoothing variables
   
   float* output_L;
@@ -510,7 +510,7 @@ run(LV2_Handle instance, uint32_t n_samples)
   float* const       outputR = self->output_R;
 
   // base MIDI note
-  int base_note = (int)*(self->base_note)
+  int base_note = (int)*(self->base_note);
 
   // zero output buffer
   memset ( outputL, 0, n_samples );

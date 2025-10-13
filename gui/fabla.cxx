@@ -158,8 +158,8 @@ void FablaUI::cb_p4(Pad* o, void* v) {
 
 void FablaUI::cb_compAttack_i(Dial* o, void*) {
   float tmp = o->value();
-//compressor->attack( tmp );
-writeFunction(controller, COMP_ATTACK, sizeof(float), 0, (const void*) &tmp);
+  //compressor->attack( tmp );
+  writeFunction(controller, COMP_ATTACK, sizeof(float), 0, (const void*) &tmp);
 }
 void FablaUI::cb_compAttack(Dial* o, void* v) {
   ((FablaUI*)(o->parent()->user_data()))->cb_compAttack_i(o,v);
@@ -167,8 +167,8 @@ void FablaUI::cb_compAttack(Dial* o, void* v) {
 
 void FablaUI::cb_compThres_i(Dial* o, void*) {
   float tmp = o->value();
-compressor->threshold( tmp );
-writeFunction(controller, COMP_THRES, sizeof(float), 0, (const void*) &tmp);
+  compressor->threshold( tmp );
+  writeFunction(controller, COMP_THRES, sizeof(float), 0, (const void*) &tmp);
 }
 void FablaUI::cb_compThres(Dial* o, void* v) {
   ((FablaUI*)(o->parent()->user_data()))->cb_compThres_i(o,v);
@@ -176,8 +176,8 @@ void FablaUI::cb_compThres(Dial* o, void* v) {
 
 void FablaUI::cb_compRatio_i(Dial* o, void*) {
   float tmp = o->value();
-compressor->ratio( tmp );
-writeFunction(controller, COMP_RATIO, sizeof(float), 0, (const void*) &tmp);
+  compressor->ratio( tmp );
+  writeFunction(controller, COMP_RATIO, sizeof(float), 0, (const void*) &tmp);
 }
 void FablaUI::cb_compRatio(Dial* o, void* v) {
   ((FablaUI*)(o->parent()->user_data()))->cb_compRatio_i(o,v);
@@ -185,10 +185,11 @@ void FablaUI::cb_compRatio(Dial* o, void* v) {
 
 void FablaUI::cb_gain_i(Dial* o, void*) {
   float tmp = o->value();
-int port = int(PAD_GAIN) + selectedPad;
-padData[selectedPad].gain = tmp;
-writeFunction(controller, port, sizeof(float), 0, (const void*) &tmp);
-//printf("gain on pad# %i, port# %i, value %f\n", selectedPad, port, tmp);
+  unsigned int pad = selectedPad + selectedPage * 16;
+  int port = int(PAD_GAIN) + pad;
+  padData[pad].gain = tmp;
+  writeFunction(controller, port, sizeof(float), 0, (const void*) &tmp);
+  //printf("gain on pad# %i, port# %i, value %f\n", pad, port, tmp);
 }
 void FablaUI::cb_gain(Dial* o, void* v) {
   ((FablaUI*)(o->parent()->user_data()))->cb_gain_i(o,v);
@@ -196,12 +197,12 @@ void FablaUI::cb_gain(Dial* o, void* v) {
 
 void FablaUI::cb_d_i(Dial* o, void*) {
   adsr->decay( o->value() );
-
-float tmp = o->value();
-int port = int(PAD_DECAY) + selectedPad;
-padData[selectedPad].d = tmp;
-writeFunction(controller, port, sizeof(float), 0, (const void*) &tmp);
-printf("decay on pad# %i, port# %i, value %f\n", selectedPad, port, tmp);
+  float tmp = o->value();
+  unsigned int pad = selectedPad + selectedPage * 16;
+  int port = int(PAD_DECAY) + pad;
+  padData[pad].d = tmp;
+  writeFunction(controller, port, sizeof(float), 0, (const void*) &tmp);
+  //printf("decay on pad# %i, port# %i, value %f\n", pad, port, tmp);
 }
 void FablaUI::cb_d(Dial* o, void* v) {
   ((FablaUI*)(o->parent()->user_data()))->cb_d_i(o,v);
@@ -209,10 +210,11 @@ void FablaUI::cb_d(Dial* o, void* v) {
 
 void FablaUI::cb_speed_i(Dial* o, void*) {
   float tmp = o->value();
-int port = int(PAD_SPEED) + selectedPad;
-padData[selectedPad].speed = tmp;
-writeFunction(controller, port, sizeof(float), 0, (const void*) &tmp);
-printf("speed on pad# %i, port# %i, value %f\n", selectedPad, port, tmp);
+  unsigned int pad = selectedPad + selectedPage * 16;
+  int port = int(PAD_SPEED) + pad;
+  padData[pad].speed = tmp;
+  writeFunction(controller, port, sizeof(float), 0, (const void*) &tmp);
+  //printf("speed on pad# %i, port# %i, value %f\n", pad, port, tmp);
 }
 void FablaUI::cb_speed(Dial* o, void* v) {
   ((FablaUI*)(o->parent()->user_data()))->cb_speed_i(o,v);
@@ -220,12 +222,12 @@ void FablaUI::cb_speed(Dial* o, void* v) {
 
 void FablaUI::cb_a_i(Dial* o, void*) {
   adsr->attack( o->value() );
-
-float tmp = o->value();
-int port = int(PAD_ATTACK) + selectedPad;
-padData[selectedPad].a = tmp;
-writeFunction(controller, port, sizeof(float), 0, (const void*) &tmp);
-printf("attack on pad# %i, port# %i, value %f\n", selectedPad, port, tmp);
+  float tmp = o->value();
+  unsigned int pad = selectedPad + selectedPage * 16;
+  int port = int(PAD_ATTACK) + pad;
+  padData[pad].a = tmp;
+  writeFunction(controller, port, sizeof(float), 0, (const void*) &tmp);
+  //printf("attack on pad# %i, port# %i, value %f\n", pad, port, tmp);
 }
 void FablaUI::cb_a(Dial* o, void* v) {
   ((FablaUI*)(o->parent()->user_data()))->cb_a_i(o,v);
@@ -233,12 +235,12 @@ void FablaUI::cb_a(Dial* o, void* v) {
 
 void FablaUI::cb_r_i(Dial* o, void*) {
   adsr->release( o->value() );
-
-float tmp = o->value();
-int port = int(PAD_RELEASE) + selectedPad;
-padData[selectedPad].r = tmp;
-writeFunction(controller, port, sizeof(float), 0, (const void*) &tmp);
-printf("release on pad# %i, port# %i, value %f\n", selectedPad, port, tmp);
+  float tmp = o->value();
+  unsigned int pad = selectedPad + selectedPage * 16;
+  int port = int(PAD_RELEASE) + pad;
+  padData[pad].r = tmp;
+  writeFunction(controller, port, sizeof(float), 0, (const void*) &tmp);
+  //printf("release on pad# %i, port# %i, value %f\n", pad, port, tmp);
 }
 void FablaUI::cb_r(Dial* o, void* v) {
   ((FablaUI*)(o->parent()->user_data()))->cb_r_i(o,v);
@@ -246,12 +248,12 @@ void FablaUI::cb_r(Dial* o, void* v) {
 
 void FablaUI::cb_s_i(Dial* o, void*) {
   adsr->sustain( o->value() );
-
-float tmp = o->value();
-int port = int(PAD_SUSTAIN) + selectedPad;
-padData[selectedPad].s = tmp;
-writeFunction(controller, port, sizeof(float), 0, (const void*) &tmp);
-printf("sustain on pad# %i, port# %i, value %f\n", selectedPad, port, tmp);
+  float tmp = o->value();
+  unsigned int pad = selectedPad + selectedPage * 16;
+  int port = int(PAD_SUSTAIN) + pad;
+  padData[pad].s = tmp;
+  writeFunction(controller, port, sizeof(float), 0, (const void*) &tmp);
+  //printf("sustain on pad# %i, port# %i, value %f\n", pad, port, tmp);
 }
 void FablaUI::cb_s(Dial* o, void* v) {
   ((FablaUI*)(o->parent()->user_data()))->cb_s_i(o,v);
@@ -259,10 +261,11 @@ void FablaUI::cb_s(Dial* o, void* v) {
 
 void FablaUI::cb_pan_i(Dial* o, void*) {
   float tmp = o->value();
-int port = int(PAD_PAN) + selectedPad;
-padData[selectedPad].pan = tmp;
-writeFunction(controller, port, sizeof(float), 0, (const void*) &tmp);
-printf("pan on pad# %i, port# %i, value %f\n", selectedPad, port, tmp);
+  unsigned int pad = selectedPad + selectedPage * 16;
+  int port = int(PAD_PAN) + pad;
+  padData[pad].pan = tmp;
+  writeFunction(controller, port, sizeof(float), 0, (const void*) &tmp);
+  //printf("pan on pad# %i, port# %i, value %f\n", pad, port, tmp);
 }
 void FablaUI::cb_pan(Dial* o, void* v) {
   ((FablaUI*)(o->parent()->user_data()))->cb_pan_i(o,v);
@@ -286,7 +289,9 @@ Fl_Double_Window* FablaUI::setupUI() {
   fl_open_display();
   
   lastUsedPath = getenv("HOME");
-  
+
+  baseNote = 36;
+  selectedPage = 0;
   selectedPad = 0;
   { w = new Fl_Double_Window(515, 490, "Fabla");
     w->box(FL_UP_BOX);
@@ -820,27 +825,29 @@ void FablaUI::select_pad(int p) {
     case 16: p16->selected(true); break;
     default: printf("unknown pad");
   }
-  
+
+  unsigned int pad = selectedPad + selectedPage * 16;
+
   // set dial values
-  gain->value( padData[selectedPad].gain );
-  speed->value( padData[selectedPad].speed );
-  pan->value( padData[selectedPad].pan );
+  gain->value( padData[pad].gain );
+  speed->value( padData[pad].speed );
+  pan->value( padData[pad].pan );
   
-  a->value( padData[selectedPad].a );
-  d->value( padData[selectedPad].d );
-  s->value( padData[selectedPad].s );
-  r->value( padData[selectedPad].r );
+  a->value( padData[pad].a );
+  d->value( padData[pad].d );
+  s->value( padData[pad].s );
+  r->value( padData[pad].r );
   
-  // set ADSR values
+  // set ADSR dial values
   adsr->attack ( a->value() );
   adsr->decay  ( d->value() );
   adsr->sustain( s->value() );
   adsr->release( r->value() );
   
   // set Waveform to draw new data
-  if ( padData[selectedPad].loaded )
+  if ( padData[pad].loaded )
   {
-    waveform->setData( UI_WAVEFORM_PIXELS, padData[selectedPad].waveformLength, padData[selectedPad].waveform, padData[selectedPad].name );
+    waveform->setData( UI_WAVEFORM_PIXELS, padData[pad].waveformLength, padData[pad].waveform, padData[pad].name );
   }
   else
   {
@@ -850,7 +857,7 @@ void FablaUI::select_pad(int p) {
 
 void FablaUI::pad_click(int id, int rclick) {
   //printf("pad %i clicked, right = %i\n", id, rclick);
-  
+  int ui_pad = id + selectedPage * 16;
   if ( rclick )
   {
     // pop up "load sample" dialog, write Atom event to DSP
@@ -889,7 +896,7 @@ void FablaUI::pad_click(int id, int rclick) {
     fnfc.type(Fl_Native_File_Chooser::BROWSE_FILE);
     fnfc.filter("Audio\t{*.aiff,*.wav,*.flac}");
     fnfc.directory( lastUsedPath.c_str() );
-    
+
     switch ( fnfc.show() )
     {
       case -1: printf("ERROR: %s\\n", fnfc.errmsg());    break;  // ERROR
@@ -899,7 +906,7 @@ void FablaUI::pad_click(int id, int rclick) {
         char* filename = strdup( fnfc.filename() );
         //printf("Loading directory: %s, %s\n", fnfc.filename(), dirname( filename ) );
         
-        writeLoadSample(fabla, id, fnfc.filename(), strlen( fnfc.filename() ));
+        writeLoadSample(fabla, ui_pad, fnfc.filename(), strlen( fnfc.filename() ));
         lastUsedPath = dirname(filename);
         free (filename);
       }
@@ -910,7 +917,7 @@ void FablaUI::pad_click(int id, int rclick) {
   else
   {
     // write pad play Atom to DSP
-    writePadPlay( fabla, id );
+    writePadPlay( fabla, ui_pad );
     
     // update the UI showing the ADSR / waveform of this pad
     select_pad( id );

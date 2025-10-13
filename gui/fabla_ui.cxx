@@ -153,7 +153,8 @@ static void port_event(LV2UI_Handle handle,
     switch ( port_index )
     {
       case MASTER_VOL: ui->masterVol->value( v );     break;
-      
+      case BASE_NOTE: ui->baseNote = (int)v; /* TODO GUI! */     break;
+
       case COMP_ATTACK: ui->compAttack->value(v);     break;
       case COMP_DECAY:  ui->compRelease->value(v);    break;
       case COMP_RATIO:  ui->compRatio->value(v);
@@ -161,12 +162,8 @@ static void port_event(LV2UI_Handle handle,
       case COMP_THRES:  ui->compThres->value(v);
                         ui->compressor->threshold(v); break;
       case COMP_MAKEUP: ui->compressor->makeup(v);    break;
-      
       case COMP_ENABLE: ui->compressor->set_active(v);break;
-      
-      
-      
-      
+
       case ATOM_OUT:
           if (format != self->uris->atom_eventTransfer) {
             printf("FablaUI: format != atom_eventTransfer\n");
@@ -192,14 +189,14 @@ static void port_event(LV2UI_Handle handle,
               const LV2_Atom_Int* padNum = 0;
               lv2_atom_object_get( body, self->uris->fabla_pad, &padNum, 0);
               int* p = (int*)LV2_ATOM_BODY(padNum);
-              int pad = *p - 36;
-              
+              int pad = *p - ui->baseNote;
+              int ui_pad = pad - ui->selectedPage * 16;
               //fprintf(stderr,"note on, %i\n", pad);
               
-              if ( pad >= 0 && pad < 16 )
+              if ( ui_pad >= 0 && ui_pad < 16 )
               {
-                //printf("pad on %i\n", pad );
-                switch ( pad )
+                //printf("pad on %i\n", ui_pad );
+                switch ( ui_pad )
                 {
                   case 0:  ui->p1->play(true);  break;
                   case 1:  ui->p2->play(true);  break;
@@ -222,7 +219,7 @@ static void port_event(LV2UI_Handle handle,
                 
                 // set the "selectedPad" to the played note
                 
-                ui->select_pad(pad);
+                ui->select_pad(ui_pad);
                 ui->adsr->setName( ui->padData[pad].name );
               }
               
@@ -236,14 +233,14 @@ static void port_event(LV2UI_Handle handle,
               const LV2_Atom_Int* padNum = 0;
               lv2_atom_object_get( body, self->uris->fabla_pad, &padNum, 0);
               int* p = (int*)LV2_ATOM_BODY(padNum);
-              int pad = *p - 36;
-              
+              int pad = *p - ui->baseNote;
+              int ui_pad = pad - ui->selectedPage * 16;
               //fprintf(stderr,"note off, %i\n", pad);
               
-              if ( pad >= 0 && pad < 16 )
+              if ( ui_pad >= 0 && ui_pad < 16 )
               {
-                //printf("pad off %i\n", pad );
-                switch ( pad )
+                //printf("pad off %i\n", ui_pad );
+                switch ( ui_pad )
                 {
                   case 0:  ui->p1->play(false);  break;
                   case 1:  ui->p2->play(false);  break;
@@ -392,7 +389,7 @@ static void port_event(LV2UI_Handle handle,
               ui->padData[pad].loaded = true;
               ui->padData[pad].waveformLength = info.frames;
               
-              if(ui->selectedPad == pad )
+              if((int)ui->selectedPad == pad )
               {
                 ui->waveform->setData( UI_WAVEFORM_PIXELS, info.frames, &ui->padData[pad].waveform[0], sub );
               }
@@ -403,7 +400,8 @@ static void port_event(LV2UI_Handle handle,
               sf_close(sndfile);
               
               // set UI pad loaded
-              switch ( pad )
+              int ui_pad = pad - ui->selectedPage * 16;
+              switch ( ui_pad )
               {
                 case 0:  ui->p1->loaded(true);  ui->p1 ->setName( ui->padData[pad].name ); break;
                 case 1:  ui->p2->loaded(true);  ui->p2 ->setName( ui->padData[pad].name ); break;
@@ -429,62 +427,47 @@ static void port_event(LV2UI_Handle handle,
       
       
       // handle all PAD ports here:
-      case PAD_GAIN:
-      case pg2: case pg3: case pg4: case pg5: case pg6: case pg7: case pg8: case pg9:
-      case pg10: case pg11: case pg12: case pg13: case pg14: case pg15: case pg16:
+      case PAD_GAIN ... PAD_GAIN + NPADS - 1:
           // hack the enum to access the right array slice
           //printf("Gain Pad %i, pad# %i\n", port_index, port_index - int(PAD_GAIN) );
-          ui->padData[ port_index-int(PAD_GAIN) ].gain = *(float*)buffer;
-          if ( int(port_index - PAD_GAIN) == ui->selectedPad )
+          ui->padData[ port_index - PAD_GAIN ].gain = *(float*)buffer;
+          if ( port_index - PAD_GAIN == ui->selectedPad + ui->selectedPage * 16 )
             ui->gain->value( *(float*)buffer );
           break;
-      case PAD_SPEED:
-      case pspd2: case pspd3: case pspd4: case pspd5: case pspd6: case pspd7: case pspd8: case pspd9:
-      case pspd10: case pspd11: case pspd12: case pspd13: case pspd14: case pspd15: case pspd16:
-          ui->padData[ port_index-int(PAD_SPEED) ].speed = *(float*)buffer;
-          if ( int(port_index - PAD_SPEED) == int(ui->selectedPad) )
+      case PAD_SPEED ... PAD_SPEED + NPADS - 1:
+          ui->padData[ port_index - PAD_SPEED ].speed = *(float*)buffer;
+          if ( port_index - PAD_SPEED == ui->selectedPad + ui->selectedPage * 16 )
             ui->speed->value( *(float*)buffer );
           break;
-      
-      
-      case PAD_PAN:
-      case pp2: case pp3: case pp4: case pp5: case pp6: case pp7: case pp8: case pp9:
-      case pp10: case pp11: case pp12: case pp13: case pp14: case pp15: case pp16:
-          ui->padData[ port_index - int(PAD_PAN) ].pan = *(float*)buffer;
-          if ( int(port_index - PAD_PAN) == ui->selectedPad )
+
+      case PAD_PAN ... PAD_PAN + NPADS - 1:
+          ui->padData[ port_index - PAD_PAN ].pan = *(float*)buffer;
+          if ( port_index - PAD_PAN == ui->selectedPad + ui->selectedPage * 16 )
             ui->pan->value( *(float*)buffer );
           break;
       
       // ADSR
-      case PAD_ATTACK:
-      case pa2: case pa3: case pa4: case pa5: case pa6: case pa7: case pa8: case pa9:
-      case pa10: case pa11: case pa12: case pa13: case pa14: case pa15: case pa16:
-          ui->padData[ port_index - int(PAD_ATTACK) ].a = *(float*)buffer;
-          if ( int(port_index - PAD_ATTACK) == ui->selectedPad )
+      case PAD_ATTACK ... PAD_ATTACK + NPADS - 1:
+          ui->padData[ port_index - PAD_ATTACK ].a = *(float*)buffer;
+          if ( port_index - PAD_ATTACK == ui->selectedPad + ui->selectedPage * 16 )
             ui->a->value( *(float*)buffer );
           break;
       
-      case PAD_DECAY:
-      case pd2: case pd3: case pd4: case pd5: case pd6: case pd7: case pd8: case pd9:
-      case pd10: case pd11: case pd12: case pd13: case pd14: case pd15: case pd16:
-          ui->padData[ port_index - int(PAD_DECAY) ].d = *(float*)buffer;
-          if ( int(port_index - PAD_DECAY) == ui->selectedPad )
+      case PAD_DECAY ... PAD_DECAY + NPADS - 1:
+          ui->padData[ port_index - PAD_DECAY ].d = *(float*)buffer;
+          if ( port_index - PAD_DECAY == ui->selectedPad + ui->selectedPage * 16 )
             ui->d->value( *(float*)buffer );
           break;
       
-      case PAD_SUSTAIN:
-      case ps2: case ps3: case ps4: case ps5: case ps6: case ps7: case ps8: case ps9:
-      case ps10: case ps11: case ps12: case ps13: case ps14: case ps15: case ps16:
-          ui->padData[ port_index - int(PAD_SUSTAIN) ].s = *(float*)buffer;
-          if ( int(port_index - PAD_SUSTAIN) == ui->selectedPad )
+      case PAD_SUSTAIN ... PAD_SUSTAIN + NPADS - 1:
+          ui->padData[ port_index - PAD_SUSTAIN ].s = *(float*)buffer;
+          if ( port_index - PAD_SUSTAIN == ui->selectedPad + ui->selectedPage * 16 )
             ui->s->value( *(float*)buffer );
           break;
       
-      case PAD_RELEASE:
-      case pr2: case pr3: case pr4: case pr5: case pr6: case pr7: case pr8: case pr9:
-      case pr10: case pr11: case pr12: case pr13: case pr14: case pr15: case pr16:
-          ui->padData[ port_index - int(PAD_RELEASE) ].r = *(float*)buffer;
-          if ( int(port_index - PAD_RELEASE) == ui->selectedPad )
+      case PAD_RELEASE ... PAD_RELEASE + NPADS - 1:
+          ui->padData[ port_index - PAD_RELEASE ].r = *(float*)buffer;
+          if ( port_index - PAD_RELEASE == ui->selectedPad + ui->selectedPage * 16 )
             ui->r->value( *(float*)buffer );
           break;
       
