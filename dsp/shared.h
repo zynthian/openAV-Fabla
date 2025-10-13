@@ -85,8 +85,8 @@ typedef struct {
   LV2_URID fabla_level_r;
   LV2_URID fabla_waveformData;
   
-  LV2_URID padFilename[16];
-  LV2_URID padFpath[16];
+  LV2_URID padFilename[NPADS];
+  LV2_URID padFpath[NPADS];
   
 } Fabla_URIs;
 
@@ -139,7 +139,7 @@ map_uris(LV2_URID_Map* map, Fabla_URIs* uris)
 
   //34
   // Sample restore URI's  per pad
-  for ( int i = 0; i < 16; i++ )
+  for ( int i = 0; i < NPADS; i++ )
   {
     std::stringstream s;
     s << FABLA_URI"#pad_" << i << "_filename";
@@ -147,7 +147,7 @@ map_uris(LV2_URID_Map* map, Fabla_URIs* uris)
   }
 
   // Sample file path properties
-  for ( int i = 0; i < 16; i++ )
+  for ( int i = 0; i < NPADS; i++ )
   {
     std::stringstream s;
     s << FABLA_URI"#pad_fpath_" << i+1;
