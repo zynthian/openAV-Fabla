@@ -1,6 +1,8 @@
 /*
  * Author: Harry van Haaren 2013
  *         harryhaaren@gmail.com
+ * Modified: Fernando Moyano 2024-2025
+ *         fernando@zynthian.org
  * 
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

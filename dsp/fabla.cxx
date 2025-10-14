@@ -1,6 +1,8 @@
 /*
  * Author: Harry van Haaren 2013
  *         harryhaaren@gmail.com
+ * Modified: Fernando Moyano 2024-2025
+ *         fernando@zynthian.org
  * 
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -511,6 +513,7 @@ run(LV2_Handle instance, uint32_t n_samples)
 
   // base MIDI note
   int base_note = (int)*(self->base_note);
+  //int base_note = 36;
 
   // zero output buffer
   memset ( outputL, 0, n_samples );
@@ -720,7 +723,7 @@ run(LV2_Handle instance, uint32_t n_samples)
     
     self->updateUiPathCounter++;
     
-    if ( self->updateUiPathCounter > 15 )
+    if ( self->updateUiPathCounter >= NPADS )
     {
       self->updateUiPaths = false;
       self->updateUiPathCounter = 0;
