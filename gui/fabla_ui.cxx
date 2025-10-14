@@ -166,268 +166,205 @@ static void port_event(LV2UI_Handle handle,
       case COMP_MAKEUP: ui->compressor->makeup(v);    break;
       case COMP_ENABLE: ui->compressor->set_active(v);break;
 
-      case ATOM_OUT:
-          if (format != self->uris->atom_eventTransfer) {
-            printf("FablaUI: format != atom_eventTransfer\n");
-            return;
+      case ATOM_OUT: {
+        if (format != self->uris->atom_eventTransfer) {
+          printf("FablaUI: format != atom_eventTransfer\n");
+          break;
+        }
+        LV2_Atom* atom = (LV2_Atom*)buffer;
+        if (atom->type != self->uris->atom_Blank) {
+          //printf("FablaUI: atom->type != atom_Blank\n");
+          break;
+        }
+
+        // Get body
+        LV2_Atom_Object* obj = (LV2_Atom_Object*)atom;
+        const LV2_Atom_Object* body = NULL;
+
+        // NOTE ON
+        lv2_atom_object_get(obj, self->uris->fabla_Play, &body, 0);
+        if (body)
+        {
+          // Get int from body
+          const LV2_Atom_Int* padNum = 0;
+          lv2_atom_object_get( body, self->uris->fabla_pad, &padNum, 0);
+          int* p = (int*)LV2_ATOM_BODY(padNum);
+          int pad = *p - ui->baseNote;
+          int ui_pad = pad - ui->selectedPage * 16;
+          //fprintf(stderr,"note on, %i\n", pad);
+          if ( ui_pad >= 0 && ui_pad < 16 ) {
+            //printf("pad on %i\n", ui_pad );
+            ui->pads[ui_pad]->play(true);
+            // set the "selectedPad" to the played note
+            ui->select_pad(ui_pad);
+            ui->adsr->setName( ui->padData[pad].name );
           }
-          
+        }
+
+        // NOTE Off
+        body = NULL;
+        lv2_atom_object_get(obj, self->uris->fabla_Stop, &body, 0);
+        if (body)
+        {
+          // Get int from body
+          const LV2_Atom_Int* padNum = 0;
+          lv2_atom_object_get( body, self->uris->fabla_pad, &padNum, 0);
+          int* p = (int*)LV2_ATOM_BODY(padNum);
+          int pad = *p - ui->baseNote;
+          int ui_pad = pad - ui->selectedPage * 16;
+          //fprintf(stderr,"note off, %i\n", pad);
+          if ( ui_pad >= 0 && ui_pad < 16 ) {
+            //printf("pad off %i\n", ui_pad );
+            ui->pads[ui_pad]->play(false);
+          }
+        }
+
+        // Meter Levels
+        body = NULL;
+        lv2_atom_object_get(obj, self->uris->fabla_MeterLevels, &body, 0);
+        if (body)
+        {
+          const LV2_Atom_Float* L = 0;
+          lv2_atom_object_get( body, self->uris->fabla_level_l, &L, 0);
+          float levelL = *(float*)LV2_ATOM_BODY(L);
+
+          const LV2_Atom_Float* R = 0;
+          lv2_atom_object_get( body, self->uris->fabla_level_r, &R, 0);
+          float levelR = *(float*)LV2_ATOM_BODY(R);
+
+          // range scale, so 75% of the way up is 0dB FS
+          float zeroOneL = (1-(levelL / -96.f));
+          float zeroOneR = (1-(levelR / -96.f));
+
+          float finalL = pow(zeroOneL, 4);
+          float finalR = pow(zeroOneR, 4);
+
+          //printf("levelL = %f\n final %f\n", levelL, final );
+          ui->masterVol->amplitude( finalL, finalR );
+        }
+
+        // Waveform Data
+        body = NULL;
+        lv2_atom_object_get(obj, self->uris->fabla_Waveform, &body, 0);
+        if (body)
+        {
+          const LV2_Atom_Int* padNum = 0;
+          lv2_atom_object_get( body, self->uris->fabla_pad, &padNum, 0);
+          int pad = -1;
+          if ( padNum )
+            pad = *(int*)LV2_ATOM_BODY(padNum);
+
+          const LV2_Atom_String* path = 0;
+          lv2_atom_object_get( body, self->uris->fabla_filename, &path, 0);
+          const char* f = 0;
+          if ( path )
+            f = (const char*)LV2_ATOM_BODY(path);
+          if (f && strlen(f) > 0) {
+            //if ( f ) printf( "FablaUI:  recieved waveform, path: %s\n", f );
+            if ( pad == -1 ) {
+              printf( "FablaUI:  Error, waveform data message malformed\n" );
+              break;
+            }
+
+            //printf("FablaUI:  recieved waveform data on pad %i, path %s\nLoading sample now...\n", pad , f);
+
+            SF_INFO info;
+            SNDFILE* const sndfile = sf_open( f, SFM_READ, &info);
+
+            if (!sndfile) // || !info.frames ) { // || (info.channels != 1)) {
+            {
+              printf( "FablaUI: Failed to open sample '%s'\n", f);
+              break;
+            }
+
+            // Read data
+            float* data = (float*)malloc(sizeof(float) * info.frames  * info.channels);
+            if (!data) {
+              printf("FablaUI: Failed to allocate memory for sample\n");
+              break;
+            }
+            sf_seek(sndfile, 0ul, SEEK_SET);
+            sf_read_float(sndfile, data, info.frames * info.channels);
+
+            int chnls = info.channels;
+            if ( chnls > 1 )
+            {
+              //printf("Sample '%s' has %i channels: using channel 1\n", path, chnls);
+              // we're gonna kick all samples that are *not* channel 1
+              float* tmp = (float*)malloc( sizeof(float) * info.frames );
+
+              //printf("Non mono file: %i chnls found, old size %li, new size %li \n", chnls,info.channels * info.frames, info.frames );
+              for(unsigned int i = 0; i < info.frames; i++ )
+              {
+                tmp[i] = data[ i * chnls ];
+              }
+
+              // swap buffer, freeing used "multi-channel" buffer
+              free( data );
+              data = tmp;
+            }
+
+            // find how many samples per pixel
+            int samplesPerPix = info.frames / UI_WAVEFORM_PIXELS;
+
+            // loop over each pixel value we need
+            for( int p = 0; p < UI_WAVEFORM_PIXELS; p++ )
+            {
+              float average = 0.f;
+
+              // calc value for this pixel
+              for( int i = 0; i < samplesPerPix; i++ )
+              {
+                float tmp = data[i + (p * samplesPerPix)];
+                if ( tmp < 0 ) tmp = -tmp;
+                average += tmp;
+              }
+              average = (average / samplesPerPix);
+              ui->padData[pad].waveform[p] = average;
+            }
+
+            // only display "name" of file, not path
+            std::string name = f;
+            int i = name.find_last_of('/') + 1;
+            std::string sub = name.substr( i );
+
+            int dot = sub.find_last_of('.');
+            std::string fin = sub.substr( 0, dot );
+            ui->padData[pad].name = fin;
+            //printf("FablaUI: name %s\ni %i\nsub %s\n", name.c_str(), i, sub.c_str() );
+
+            ui->padData[pad].loaded = true;
+            ui->padData[pad].waveformLength = info.frames;
+
+            if ((int)ui->selectedPad == pad )
+            {
+              ui->waveform->setData( UI_WAVEFORM_PIXELS, info.frames, &ui->padData[pad].waveform[0], sub );
+            }
+            ui->waveform->redraw();
+
+            free(data);
+            sf_close(sndfile);
+
+            // set UI pad loaded
+            int ui_pad = pad - ui->selectedPage * 16;
+            if (ui_pad >= 0 && ui_pad < 16) {
+              ui->pads[ui_pad]->loaded(true);
+              ui->pads[ui_pad]->setName( ui->padData[pad].name );
+            }
+          }
+          else
           {
-            LV2_Atom* atom = (LV2_Atom*)buffer;
-            if (atom->type != self->uris->atom_Blank) {
-              //printf("FablaUI: atom->type != atom_Blank\n");
-              return;
-            }
-            
-            // Get body
-            LV2_Atom_Object* obj = (LV2_Atom_Object*)atom;
-            const LV2_Atom_Object* body = NULL;
-            
-            // NOTE ON
-            lv2_atom_object_get(obj, self->uris->fabla_Play, &body, 0);
-            if (body)
-            {
-              // Get int from body
-              const LV2_Atom_Int* padNum = 0;
-              lv2_atom_object_get( body, self->uris->fabla_pad, &padNum, 0);
-              int* p = (int*)LV2_ATOM_BODY(padNum);
-              int pad = *p - ui->baseNote;
-              int ui_pad = pad - ui->selectedPage * 16;
-              //fprintf(stderr,"note on, %i\n", pad);
-              
-              if ( ui_pad >= 0 && ui_pad < 16 )
-              {
-                //printf("pad on %i\n", ui_pad );
-                switch ( ui_pad )
-                {
-                  case 0:  ui->p1->play(true);  break;
-                  case 1:  ui->p2->play(true);  break;
-                  case 2:  ui->p3->play(true);  break;
-                  case 3:  ui->p4->play(true);  break;
-                  case 4:  ui->p5->play(true);  break;
-                  case 5:  ui->p6->play(true);  break;
-                  case 6:  ui->p7->play(true);  break;
-                  case 7:  ui->p8->play(true);  break;
-                  case 8:  ui->p9->play(true);  break;
-                  case 9:  ui->p10->play(true); break;
-                  case 10: ui->p11->play(true); break;
-                  case 11: ui->p12->play(true); break;
-                  case 12: ui->p13->play(true); break;
-                  case 13: ui->p14->play(true); break;
-                  case 14: ui->p15->play(true); break;
-                  case 15: ui->p16->play(true); break;
-                  default: break;
-                }
-                
-                // set the "selectedPad" to the played note
-                
-                ui->select_pad(ui_pad);
-                ui->adsr->setName( ui->padData[pad].name );
-              }
-              
-            }
-            
-            // NOTE Off
-            body = NULL;
-            lv2_atom_object_get(obj, self->uris->fabla_Stop, &body, 0);
-            if (body) {
-              // Get int from body
-              const LV2_Atom_Int* padNum = 0;
-              lv2_atom_object_get( body, self->uris->fabla_pad, &padNum, 0);
-              int* p = (int*)LV2_ATOM_BODY(padNum);
-              int pad = *p - ui->baseNote;
-              int ui_pad = pad - ui->selectedPage * 16;
-              //fprintf(stderr,"note off, %i\n", pad);
-              
-              if ( ui_pad >= 0 && ui_pad < 16 )
-              {
-                //printf("pad off %i\n", ui_pad );
-                switch ( ui_pad )
-                {
-                  case 0:  ui->p1->play(false);  break;
-                  case 1:  ui->p2->play(false);  break;
-                  case 2:  ui->p3->play(false);  break;
-                  case 3:  ui->p4->play(false);  break;
-                  case 4:  ui->p5->play(false);  break;
-                  case 5:  ui->p6->play(false);  break;
-                  case 6:  ui->p7->play(false);  break;
-                  case 7:  ui->p8->play(false);  break;
-                  case 8:  ui->p9->play(false);  break;
-                  case 9:  ui->p10->play(false); break;
-                  case 10: ui->p11->play(false); break;
-                  case 11: ui->p12->play(false); break;
-                  case 12: ui->p13->play(false); break;
-                  case 13: ui->p14->play(false); break;
-                  case 14: ui->p15->play(false); break;
-                  case 15: ui->p16->play(false); break;
-                  default: break;
-                }
-              }
-            }
-            
-            // Meter Levels
-            body = NULL;
-            lv2_atom_object_get(obj, self->uris->fabla_MeterLevels, &body, 0);
-            if (body)
-            {
-              const LV2_Atom_Float* L = 0;
-              lv2_atom_object_get( body, self->uris->fabla_level_l, &L, 0);
-              float levelL = *(float*)LV2_ATOM_BODY(L);
-              
-              const LV2_Atom_Float* R = 0;
-              lv2_atom_object_get( body, self->uris->fabla_level_r, &R, 0);
-              float levelR = *(float*)LV2_ATOM_BODY(R);
-              
-              
-              // range scale, so 75% of the way up is 0dB FS
-              float zeroOneL = (1-(levelL / -96.f));
-              float zeroOneR = (1-(levelR / -96.f));
-              
-              float finalL = pow(zeroOneL, 4);
-              float finalR = pow(zeroOneR, 4);
-              
-              //printf("levelL = %f\n final %f\n", levelL, final );
-              
-              ui->masterVol->amplitude( finalL, finalR );
-            }
-            
-            
-            // Waveform Data
-            body = NULL;
-            lv2_atom_object_get(obj, self->uris->fabla_Waveform, &body, 0);
-            if (body)
-            {
-              const LV2_Atom_Int* padNum = 0;
-              lv2_atom_object_get( body, self->uris->fabla_pad, &padNum, 0);
-              int pad = -1;
-              if ( padNum )
-                pad = *(int*)LV2_ATOM_BODY(padNum);
-              
-              const LV2_Atom_String* path = 0;
-              lv2_atom_object_get( body, self->uris->fabla_filename, &path, 0);
-              const char* f = 0;
-              if ( path )
-                f = (const char*)LV2_ATOM_BODY(path);
-              
-              if ( f )
-                //printf( "FablaUI:  recieved waveform, path: %s\n", f );
-              
-              if ( pad == -1 || f == 0 )
-              {
-                printf( "FablaUI:  Error, waveform data message malformed\n" );
-                return;
-              }
-              
-              //printf("FablaUI:  recieved waveform data on pad %i, path %s\nLoading sample now...\n", pad , f);
-              
-              SF_INFO info;
-              SNDFILE* const sndfile = sf_open( f, SFM_READ, &info);
-              
-              if (!sndfile) // || !info.frames ) { // || (info.channels != 1)) {
-              {
-                printf( "FablaUI:  Failed to open sample '%s'\n", f);
-                return;
-              }
-              
-              // Read data
-              float* data = (float*)malloc(sizeof(float) * info.frames  * info.channels);
-              if (!data) {
-                printf("FablaUI: Failed to allocate memory for sample\n");
-                return;
-              }
-              sf_seek(sndfile, 0ul, SEEK_SET);
-              sf_read_float(sndfile, data, info.frames * info.channels);
-              
-              
-              int chnls = info.channels;
-              if ( chnls > 1 )
-              {
-                //printf("Sample '%s' has %i channels: using channel 1\n", path, chnls);
-                // we're gonna kick all samples that are *not* channel 1
-                float* tmp = (float*)malloc( sizeof(float) * info.frames );
-                
-                //printf("Non mono file: %i chnls found, old size %li, new size %li \n", chnls,info.channels * info.frames, info.frames );
-                for(unsigned int i = 0; i < info.frames; i++ )
-                {
-                  tmp[i] = data[ i * chnls ];
-                }
-                
-                // swap buffer, freeing used "multi-channel" buffer
-                free( data );
-                data = tmp;
-              }
-              
-              
-              // find how many samples per pixel
-              int samplesPerPix = info.frames / UI_WAVEFORM_PIXELS;
-              
-              // loop over each pixel value we need
-              for( int p = 0; p < UI_WAVEFORM_PIXELS; p++ )
-              {
-                float average = 0.f;
-                
-                // calc value for this pixel
-                for( int i = 0; i < samplesPerPix; i++ )
-                {
-                  float tmp = data[i + (p * samplesPerPix)];
-                  if ( tmp < 0 ) { tmp = -tmp; }
-                  average += tmp;
-                }
-                average = (average / samplesPerPix);
-                ui->padData[pad].waveform[p] = average;
-              }
-              
-              
-              // only display "name" of file, not path
-              std::string name = f;
-              int i = name.find_last_of('/') + 1;
-              std::string sub = name.substr( i );
-              
-              int dot = sub.find_last_of('.');
-              std::string fin = sub.substr( 0, dot );
-              ui->padData[pad].name = fin;
-              //printf("FablaUI: name %s\ni %i\nsub %s\n", name.c_str(), i, sub.c_str() );
-              
-              ui->padData[pad].loaded = true;
-              ui->padData[pad].waveformLength = info.frames;
-              
-              if((int)ui->selectedPad == pad )
-              {
-                ui->waveform->setData( UI_WAVEFORM_PIXELS, info.frames, &ui->padData[pad].waveform[0], sub );
-              }
-              
-              ui->waveform->redraw();
-              
-              free(data);
-              sf_close(sndfile);
-              
-              // set UI pad loaded
-              int ui_pad = pad - ui->selectedPage * 16;
-              switch ( ui_pad )
-              {
-                case 0:  ui->p1->loaded(true);  ui->p1 ->setName( ui->padData[pad].name ); break;
-                case 1:  ui->p2->loaded(true);  ui->p2 ->setName( ui->padData[pad].name ); break;
-                case 2:  ui->p3->loaded(true);  ui->p3 ->setName( ui->padData[pad].name ); break;
-                case 3:  ui->p4->loaded(true);  ui->p4 ->setName( ui->padData[pad].name ); break;
-                case 4:  ui->p5->loaded(true);  ui->p5 ->setName( ui->padData[pad].name ); break;
-                case 5:  ui->p6->loaded(true);  ui->p6 ->setName( ui->padData[pad].name ); break;
-                case 6:  ui->p7->loaded(true);  ui->p7 ->setName( ui->padData[pad].name ); break;
-                case 7:  ui->p8->loaded(true);  ui->p8 ->setName( ui->padData[pad].name ); break;
-                case 8:  ui->p9->loaded(true);  ui->p9 ->setName( ui->padData[pad].name ); break;
-                case 9:  ui->p10->loaded(true); ui->p10->setName( ui->padData[pad].name ); break;
-                case 10: ui->p11->loaded(true); ui->p11->setName( ui->padData[pad].name ); break;
-                case 11: ui->p12->loaded(true); ui->p12->setName( ui->padData[pad].name ); break;
-                case 12: ui->p13->loaded(true); ui->p13->setName( ui->padData[pad].name ); break;
-                case 13: ui->p14->loaded(true); ui->p14->setName( ui->padData[pad].name ); break;
-                case 14: ui->p15->loaded(true); ui->p15->setName( ui->padData[pad].name ); break;
-                case 15: ui->p16->loaded(true); ui->p16->setName( ui->padData[pad].name ); break;
-                default: break;
-              }
+            // Set pad to unloaded state
+            ui->padData[pad].loaded = false;
+            int ui_pad = pad - ui->selectedPage * 16;
+            if (ui_pad >= 0 && ui_pad < 16) {
+              ui->pads[ui_pad]->loaded(false);
+              ui->pads[ui_pad]->setName( "" );
             }
           }
-        break;
-      
-      
+        }
+      }  break;
+
       // handle all PAD ports here:
       case PAD_GAIN ... PAD_GAIN + NPADS - 1:
           // hack the enum to access the right array slice
@@ -475,7 +412,7 @@ static void port_event(LV2UI_Handle handle,
       
       default: break;
     }
-    
+
     Fl::unlock();
     Fl::awake();
     

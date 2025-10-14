@@ -476,17 +476,56 @@ static void load_pad_sample(FABLA_DSP* self, int pad, const char* f)
   lv2_atom_forge_pop(&self->forge, &set_frame);
 }
 
+static void free_pad_sample(FABLA_DSP* self, int pad)
+{
+  for(int i = 0; i < NVOICES; i++ ) {
+    self->voice[i]->banishIfPlaying(pad);
+  }
+
+  if( self->samples[pad] != 0 )
+  {
+    free_sample(self, self->samples[pad]);
+    self->samples[pad] = NULL;
+  }
+
+  //lv2_log_note(&self->logger, "finished unloading sample, updating UI!\n" );
+
+  // send the filename to the UI, it will load the waveform itself
+  lv2_atom_forge_frame_time(&self->forge, 0);
+  LV2_Atom_Forge_Frame set_frame;
+
+  //LV2_Atom* set = (LV2_Atom*)
+  lv2_atom_forge_blank(&self->forge, &set_frame, 1, self->uris->atom_eventTransfer);
+
+  lv2_atom_forge_property_head(&self->forge, self->uris->fabla_Waveform, 0);
+  LV2_Atom_Forge_Frame body_frame;
+  lv2_atom_forge_blank(&self->forge, &body_frame, 2, 0);
+
+  lv2_atom_forge_property_head(&self->forge, self->uris->fabla_pad, 0);
+  lv2_atom_forge_int(&self->forge, pad);
+
+  lv2_atom_forge_property_head(&self->forge, self->uris->fabla_filename, 0);
+  lv2_atom_forge_path(&self->forge, NULL, 0 );
+
+  lv2_atom_forge_pop(&self->forge, &body_frame);
+  lv2_atom_forge_pop(&self->forge, &set_frame);
+}
+
+
 static void write_pad_fpath(FABLA_DSP* self, int pad) {
   LV2_Atom_Forge_Frame frame;
 
   lv2_atom_forge_frame_time(&self->forge, 0);
   lv2_atom_forge_object(&self->forge, &frame, 0, self->uris->patch_Set);
-
   lv2_atom_forge_key(&self->forge, self->uris->patch_property);
   lv2_atom_forge_urid(&self->forge, self->uris->padFpath[pad]);
   lv2_atom_forge_key(&self->forge, self->uris->patch_value);
-  lv2_atom_forge_path(&self->forge, self->samples[pad]->path, self->samples[pad]->path_len + 1);
-
+  if (self->samples[pad]) {
+    lv2_atom_forge_path(&self->forge, self->samples[pad]->path, self->samples[pad]->path_len + 1);
+  }
+  else {
+    lv2_atom_forge_path(&self->forge, NULL, 0);
+  }
   lv2_atom_forge_pop(&self->forge, &frame);
 }
 
@@ -670,8 +709,7 @@ run(LV2_Handle instance, uint32_t n_samples)
         const LV2_Atom* file_path = NULL;
         lv2_atom_object_get(obj, self->uris->patch_property, &property, self->uris->patch_value, &file_path, 0);
         if (property && property->type == self->uris->atom_URID &&
-            file_path && file_path->type == self->uris->atom_Path &&
-            file_path->size > 0 && file_path->size < MAX_FILE_NAME)
+            file_path && file_path->type == self->uris->atom_Path && file_path->size < MAX_FILE_NAME)
         {
           // Get pad number
           int pad = 0;
@@ -680,9 +718,13 @@ run(LV2_Handle instance, uint32_t n_samples)
           }
           if (pad < NPADS)
           {
-            const char *f = (const char *) (file_path + 1);
-            //printf("RECEIVED filepath for PAD %d => %s", pad, f);
-            load_pad_sample(self, pad, f);
+            if (file_path->size > 0) {
+              const char *f = (const char *) (file_path + 1);
+              //printf("RECEIVED filepath for PAD %d => %s", pad, f);
+              load_pad_sample(self, pad, f);
+            } else {
+              free_pad_sample(self, pad);
+            }
           }
         }
       }
@@ -693,33 +735,33 @@ run(LV2_Handle instance, uint32_t n_samples)
   // triggered by Restore / UI re-instantiate, need to write Atoms from here
   if ( self->updateUiPaths )
   {
+    //lv2_log_note(&self->logger, "writing Atom %i to UI: %s\n", self->updateUiPathCounter, self->samples[self->updateUiPathCounter]->path);
+    // write path to UI so it loads the waveform
+    lv2_atom_forge_frame_time(&self->forge, 0);
+    LV2_Atom_Forge_Frame set_frame;
+      
+    lv2_atom_forge_blank(&self->forge, &set_frame, 1, self->uris->atom_eventTransfer);
+      
+    lv2_atom_forge_property_head(&self->forge, self->uris->fabla_Waveform, 0);
+    LV2_Atom_Forge_Frame body_frame;
+    lv2_atom_forge_blank(&self->forge, &body_frame, 1, 0);
+      
+    lv2_atom_forge_property_head(&self->forge, self->uris->fabla_pad, 0);
+    lv2_atom_forge_int(&self->forge, self->updateUiPathCounter);
+
+    lv2_atom_forge_property_head(&self->forge, self->uris->fabla_filename, 0);
     if ( self->samples[self->updateUiPathCounter] )
     {
-      //lv2_log_note(&self->logger, "writing Atom %i to UI: %s\n", self->updateUiPathCounter, self->samples[self->updateUiPathCounter]->path);
-      // write path to UI so it loads the waveform
-      lv2_atom_forge_frame_time(&self->forge, 0);
-      LV2_Atom_Forge_Frame set_frame;
-      
-      lv2_atom_forge_blank(&self->forge, &set_frame, 1, self->uris->atom_eventTransfer);
-      
-      lv2_atom_forge_property_head(&self->forge, self->uris->fabla_Waveform, 0);
-      LV2_Atom_Forge_Frame body_frame;
-      lv2_atom_forge_blank(&self->forge, &body_frame, 1, 0);
-      
-      lv2_atom_forge_property_head(&self->forge, self->uris->fabla_pad, 0);
-      lv2_atom_forge_int(&self->forge, self->updateUiPathCounter);
-      
-      
-      lv2_atom_forge_property_head(&self->forge, self->uris->fabla_filename, 0);
       lv2_atom_forge_path(&self->forge,
-                          self->samples[self->updateUiPathCounter]->path,
-                          self->samples[self->updateUiPathCounter]->path_len);
-      
-      lv2_atom_forge_pop(&self->forge, &body_frame);
-      lv2_atom_forge_pop(&self->forge, &set_frame);
-
-      write_pad_fpath(self, self->updateUiPathCounter);
+                        self->samples[self->updateUiPathCounter]->path,
+                        self->samples[self->updateUiPathCounter]->path_len);
+    } else {
+      lv2_atom_forge_path(&self->forge, NULL, 0);
     }
+    lv2_atom_forge_pop(&self->forge, &body_frame);
+    lv2_atom_forge_pop(&self->forge, &set_frame);
+
+    write_pad_fpath(self, self->updateUiPathCounter);
     
     self->updateUiPathCounter++;
     
@@ -737,11 +779,9 @@ run(LV2_Handle instance, uint32_t n_samples)
   self->comp->setThreshold( *self->comp_thres  );
   self->comp->setRatio    ( *self->comp_ratio  );
   self->comp->setMakeup   ( *self->comp_makeup );
-  
-  
+
   //printf("%f\t%f\t%f\t%f\n", *self->comp_attack, *self->comp_decay, *self->comp_thres, *self->comp_ratio );
   // makeup TODO
-  
   
   for (uint32_t pos = 0; pos < n_samples; pos++)
   {
@@ -774,7 +814,8 @@ run(LV2_Handle instance, uint32_t n_samples)
   self->uiUpdateCounter += n_samples;
   
   // disable for Atom debug purposes: stops the huge stream of Atoms
-  if ( self->uiUpdateCounter > self->sr / 15 ) // ( false )// 
+  //if ( false )
+  if ( self->uiUpdateCounter > self->sr / 15 )
   {
     // send levels to UI
     float L = self->meter->getLeftDB();
@@ -1010,15 +1051,16 @@ restore(LV2_Handle                  instance,
     if (value)
     {
       const char* path = (const char*)value;
+
       if (path)
       {
         //printf( "Restoring pad %i, filepath: %s\n", i, path);
-        
+
         if ( self->samples[i] )
         {
           free_sample(self, self->samples[i] );
         }
-        
+
         Sample* newSample = load_sample(self, path);
         if ( newSample )
         {
@@ -1037,6 +1079,12 @@ restore(LV2_Handle                  instance,
       {
         printf( "Error: path of sample not valid from Restore::retrieve()\n");
       }
+    }
+    else
+    {
+      //printf( "Cleaning pad %i\n", i);
+      free_pad_sample(self, i);
+      write_pad_fpath(self, i);
     }
   }
   

@@ -190,15 +190,18 @@ private:
 public:
   Dial *pan;
 private:
+  void setup_pad_array();
   void cb_pan_i(Dial*, void*);
   static void cb_pan(Dial*, void*);
 public:
-  Fabla* fabla; 
+  Fabla* fabla;
+  Pad *pages[4];
+  Pad *pads[16];
+  char pad_labels[16][4] = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16" };
   void idle();
   unsigned int baseNote;
   void select_pad(int p);
   unsigned int selectedPad;
-  char pad_labels[16][4] = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16" };
   void pad_click(int id, int rclick);
   LV2UI_Controller controller; 
   LV2UI_Write_Function writeFunction; 

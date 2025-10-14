@@ -47,36 +47,12 @@ void FablaUI::cb_compRelease(Dial* o, void* v) {
 
 void FablaUI::select_page(unsigned int page) {
   selectedPage = page;
-  switch(page) {
-    case 0:
-      page1->selected(true);
-      page2->selected(false);
-      page3->selected(false);
-      page4->selected(false);
-      break;
-    case 1:
-      page1->selected(false);
-      page2->selected(true);
-      page3->selected(false);
-      page4->selected(false);
-      break;
-    case 2:
-      page1->selected(false);
-      page2->selected(false);
-      page3->selected(true);
-      page4->selected(false);
-      break;
-    case 3:
-      page1->selected(false);
-      page2->selected(false);
-      page3->selected(false);
-      page4->selected(true);
-      break;
-    default:
-      return;
+  // Update page buttons
+  for (int i=0; i<4; i++) {
+    if (i == page) pages[i]->selected(true);
+    else pages[i]->selected(false);
   }
   // Update pads
-  Pad *pads[16] = { p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16 };
   int padi = selectedPage * 16;
   for (int i=0; i<16; i++) {
     snprintf(pad_labels[i], 4, "%u", padi + 1);
@@ -332,13 +308,38 @@ void FablaUI::cb_pan(Dial* o, void* v) {
   ((FablaUI*)(o->parent()->user_data()))->cb_pan_i(o,v);
 }
 
+void FablaUI::setup_pad_array() {
+  pads[0] = p1;
+  pads[1] = p2;
+  pads[2] = p3;
+  pads[3] = p4;
+  pads[4] = p5;
+  pads[5] = p6;
+  pads[6] = p7;
+  pads[7] = p8;
+  pads[8] = p9;
+  pads[9] = p10;
+  pads[10] = p11;
+  pads[11] = p12;
+  pads[12] = p13;
+  pads[13] = p14;
+  pads[14] = p15;
+  pads[15] = p16;
+  pages[0] = page1;
+  pages[1] = page2;
+  pages[2] = page3;
+  pages[3] = page4;
+}
+
 FablaUI::FablaUI() {
   setupUI();
+  setup_pad_array();
   w->show();
 }
 
 FablaUI::FablaUI(void* xParentWindow, Fabla* f) {
   setupUI();
+  setup_pad_array();
   fabla = f;
   
   // embed drawn stuff into LV2 host provided area  
@@ -903,48 +904,11 @@ void FablaUI::idle() {
 }
 
 void FablaUI::select_pad(int p) {
-  switch(selectedPad + 1)
-  {
-    case 1:  p1->selected(false);  break;
-    case 2:  p2->selected(false);  break;
-    case 3:  p3->selected(false);  break;
-    case 4:  p4->selected(false);  break;
-    case 5:  p5->selected(false);  break;
-    case 6:  p6->selected(false);  break;
-    case 7:  p7->selected(false);  break;
-    case 8:  p8->selected(false);  break;
-    case 9:  p9->selected(false);  break;
-    case 10: p10->selected(false); break;
-    case 11: p11->selected(false); break;
-    case 12: p12->selected(false); break;
-    case 13: p13->selected(false); break;
-    case 14: p14->selected(false); break;
-    case 15: p15->selected(false); break;
-    case 16: p16->selected(false); break;
-    default: printf("unknown pad");
-  }
-  
+  if (p < 0 || p > 15) return;
+
+  pads[selectedPad]->selected(false);
   selectedPad = p;
-  switch(selectedPad+1)
-  {
-    case 1:  p1->selected(true);  break;
-    case 2:  p2->selected(true);  break;
-    case 3:  p3->selected(true);  break;
-    case 4:  p4->selected(true);  break;
-    case 5:  p5->selected(true);  break;
-    case 6:  p6->selected(true);  break;
-    case 7:  p7->selected(true);  break;
-    case 8:  p8->selected(true);  break;
-    case 9:  p9->selected(true);  break;
-    case 10: p10->selected(true); break;
-    case 11: p11->selected(true); break;
-    case 12: p12->selected(true); break;
-    case 13: p13->selected(true); break;
-    case 14: p14->selected(true); break;
-    case 15: p15->selected(true); break;
-    case 16: p16->selected(true); break;
-    default: printf("unknown pad");
-  }
+  pads[selectedPad]->selected(true);
 
   unsigned int pad = selectedPad + selectedPage * 16;
 
@@ -965,12 +929,9 @@ void FablaUI::select_pad(int p) {
   adsr->release( r->value() );
   
   // set Waveform to draw new data
-  if ( padData[pad].loaded )
-  {
+  if ( padData[pad].loaded ) {
     waveform->setData( UI_WAVEFORM_PIXELS, padData[pad].waveformLength, padData[pad].waveform, padData[pad].name );
-  }
-  else
-  {
+  } else {
     waveform->setData( 0, 0, 0, "" );
   }
 }
