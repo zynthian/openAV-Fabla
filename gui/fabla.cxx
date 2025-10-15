@@ -48,13 +48,13 @@ void FablaUI::cb_compRelease(Dial* o, void* v) {
 void FablaUI::select_page(unsigned int page) {
   selectedPage = page;
   // Update page buttons
-  for (int i=0; i<4; i++) {
+  for (unsigned int i=0; i<4; i++) {
     if (i == page) pages[i]->selected(true);
     else pages[i]->selected(false);
   }
   // Update pads
-  int padi = selectedPage * 16;
-  for (int i=0; i<16; i++) {
+  unsigned int padi = selectedPage * 16;
+  for (unsigned int i=0; i<16; i++) {
     snprintf(pad_labels[i], 4, "%u", padi + 1);
     if (padData[padi].loaded) {
       pads[i]->setName(padData[padi].name);
