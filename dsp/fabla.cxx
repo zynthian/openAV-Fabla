@@ -141,6 +141,7 @@ typedef struct {
 static Sample* load_sample(FABLA_DSP* self, const char* path)
 {
   const size_t path_len  = strlen(path);
+  if (path_len ==0 ) return NULL;
   
   //lv2_log_note(&self->logger, "Loading sample %s\n", path);
   
@@ -161,6 +162,7 @@ static Sample* load_sample(FABLA_DSP* self, const char* path)
   float* data = (float*)malloc(sizeof(float) * info->frames * info->channels );
   if (!data) {
     lv2_log_error(&self->logger, "Failed to allocate memory for sample\n");
+    delete(sample);
     return NULL;
   }
   
@@ -851,7 +853,7 @@ work(LV2_Handle                  instance,
      uint32_t                    size,
      const void*                 data)
 {
-  printf("Fabla: Work() now\n" );
+  //printf("Fabla: Work() now\n" );
   FABLA_DSP*  self = (FABLA_DSP*)instance;
   LV2_Atom* atom = (LV2_Atom*)data;
   
@@ -864,18 +866,18 @@ work(LV2_Handle                  instance,
   }
   else
   {
-    printf("Fabla Work()  LoadSample type message\n" );
+    //printf("Fabla Work()  LoadSample type message\n" );
     /* Handle set message (load sample). */
     LV2_Atom_Object* obj = (LV2_Atom_Object*)data;
     
-    printf("Fabla Work()  LV2_Atom_Object atom type %i, body.otype %i \n", obj->atom.type, obj->body.otype );
+    //printf("Fabla Work()  LV2_Atom_Object atom type %i, body.otype %i \n", obj->atom.type, obj->body.otype );
     
     /* Get file path from message */
     const LV2_Atom_Int* sampleNum = 0;// FIXME read_set_file_sample_number(&self->uris, obj);
     
     if ( !sampleNum )
     {
-      printf("Fabla Work()  LoadSample Sample number not found in Atom\n" );
+      //printf("Fabla Work()  LoadSample Sample number not found in Atom\n" );
     }
     else
     {
@@ -1012,7 +1014,7 @@ save(LV2_Handle                instance,
       
       if ( apath )
       {
-        printf("Storing on pad %i, apath %s\n", i, apath );
+        //printf("Storing on pad %i, apath %s\n", i, apath );
         store(handle,
             self->uris->padFilename[i],
             apath,
@@ -1024,7 +1026,7 @@ save(LV2_Handle                instance,
       }
       else
       {
-        printf("apath = null on pad %i\n", i );
+        //printf("apath = null on pad %i\n", i );
       }
     }
   }
@@ -1052,7 +1054,7 @@ restore(LV2_Handle                  instance,
     {
       const char* path = (const char*)value;
 
-      if (path)
+      if (path and strlen(path)>0)
       {
         //printf( "Restoring pad %i, filepath: %s\n", i, path);
 
