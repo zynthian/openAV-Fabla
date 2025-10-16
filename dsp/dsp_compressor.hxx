@@ -74,19 +74,20 @@ class Compressor
     
     Compressor(int rate)
     {
-      fSamplingFreq = rate;
+      iSamplingFreq = rate;
       
-      iConst0 = min(192000, max(1, fSamplingFreq));
+      iConst0 = min(192000, max(1, iSamplingFreq));
       fConst1 = (2.0f / iConst0);
       fConst2 = (1.0f / iConst0);
-      
       
       ratio = 1.0f;
       threshold = 0.0f;
       attack = 0.1f;
       release = 0.1f;
       makeup = 0.f;
-      
+
+      precalc();
+
       fRec0[0] = 0;
       fRec0[1] = 0;
       
@@ -96,17 +97,20 @@ class Compressor
       fRec2[0] = 0;
       fRec2[1] = 0;
     }
-    
+
+    void precalc() {
+      fSlow0 = attack;
+      fSlow1 = expf((0 - (fConst1 / attack)));
+      fSlow2 = threshold;
+      fSlow3 = expf((0 - (fConst2 / attack)));
+      fSlow4 = expf((0 - (fConst2 / release)));
+      fSlow5 = (1.0f - fSlow4);
+      fSlow6 = (1.0f - fSlow3);
+      fSlow7 = ((1.0f - fSlow1) * ((1.0f / float(ratio)) - 1));
+    }
+
     void process (int count, float** input, float** output)
     {
-      float 	fSlow0 = attack;
-      float 	fSlow1 = expf((0 - (fConst1 / fSlow0)));
-      float 	fSlow2 = threshold;
-      float 	fSlow3 = expf((0 - (fConst2 / fSlow0)));
-      float 	fSlow4 = expf((0 - (fConst2 / release)));
-      float 	fSlow5 = (1.0f - fSlow4);
-      float 	fSlow6 = (1.0f - fSlow3);
-      float 	fSlow7 = ((1.0f - fSlow1) * ((1.0f / float(ratio)) - 1));
       float* input0 = input[0];
       float* input1 = input[1];
       float* output0 = output[0];
@@ -118,7 +122,10 @@ class Compressor
         float fTemp2 = fabsf((fabsf(fTemp1) + fabsf(fTemp0)));
         fRec2[0] = ((fSlow5 * fTemp2) + (fSlow4 * max(fTemp2, fRec2[1])));
         fRec1[0] = ((fSlow6 * fRec2[0]) + (fSlow3 * fRec1[1]));
-        fRec0[0] = ((fSlow7 * max(((20 * log10f(fRec1[0])) - fSlow2), 0.f)) + (fSlow1 * fRec0[1]));
+        if (fRec1[0] <= 0)
+           fRec0[0] = ((fSlow7 * max(((20 * log10f(fRec1[0])) - fSlow2), 0.f)) + (fSlow1 * fRec0[1]));
+        else
+           fRec0[0] = fSlow1 * fRec0[1];
         float fTemp3 = powf(10,(0.05f * fRec0[0]));
         output0[i] = (float)(fTemp0 * fTemp3) * makeup;
         output1[i] = (float)(fTemp1 * fTemp3) * makeup;
@@ -130,17 +137,27 @@ class Compressor
     }
 
   private:
-    int fSamplingFreq;
-    float attack;
-    int   iConst0;
-    float fConst1;
-    float threshold;
-    float fConst2;
-    float release;
+    int iSamplingFreq;
+
     float makeup;
+    float ratio;
+    float threshold;
+    float attack;
+    float release;
+
+    int iConst0;
+    float fConst1;
+    float fConst2;
+    float fSlow0;
+    float fSlow1;
+    float fSlow2;
+    float fSlow3;
+    float fSlow4;
+    float fSlow5;
+    float fSlow6;
+    float fSlow7;
     float fRec2[2];
     float fRec1[2];
-    float ratio;
     float fRec0[2];
 };
 

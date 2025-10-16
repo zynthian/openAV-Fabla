@@ -388,7 +388,7 @@ static void noteOn(FABLA_DSP* self, int note, int velocity, int frame)
                               *self->padData[note].r * 0.5);
       
       // set voice dependant values: pan / volume
-      self->voice[i]->setPan   ( self->samples[note]->pan  );
+      self->voice[i]->setPan( self->samples[note]->pan  );
       
       float vol = self->samples[note]->gain * (velocity / 127.);
       self->voice[i]->setVolume( vol );
@@ -554,7 +554,6 @@ run(LV2_Handle instance, uint32_t n_samples)
 
   // base MIDI note
   int base_note = (int)*(self->base_note);
-  //int base_note = 36;
 
   // zero output buffer
   memset ( outputL, 0, n_samples );
@@ -781,6 +780,7 @@ run(LV2_Handle instance, uint32_t n_samples)
   self->comp->setThreshold( *self->comp_thres  );
   self->comp->setRatio    ( *self->comp_ratio  );
   self->comp->setMakeup   ( *self->comp_makeup );
+  self->comp->precalc();
 
   //printf("%f\t%f\t%f\t%f\n", *self->comp_attack, *self->comp_decay, *self->comp_thres, *self->comp_ratio );
   // makeup TODO
@@ -797,22 +797,23 @@ run(LV2_Handle instance, uint32_t n_samples)
     
     accumL = accumL * gain;
     accumR = accumR * gain;
-    
+
     float* buf[2];
     buf[0] = &accumL;
     buf[1] = &accumR;
-    
+
     if ( *self->comp_enable > 0.5 )
     {
       self->comp->process( 1, &buf[0], &buf[0] );   // stereo, in place
     }
     
     self->meter->process( 1, &buf[0], &buf[0] ); // stereo, in place
-    
+
     outputL[pos] = accumL;
     outputR[pos] = accumR;
   }
-  
+  //printf("processing audio => L=%f, R=%f\n", outputL[0], outputR[0]);
+
   self->uiUpdateCounter += n_samples;
   
   // disable for Atom debug purposes: stops the huge stream of Atoms

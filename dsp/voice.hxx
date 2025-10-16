@@ -45,7 +45,7 @@ class Voice
       sampleCountdownQueued = false;
       
       // center the pan. 0 = left, 1 = right
-      pan = 0.5;
+      setPan(0.5);
       
       adsr = new ADSR( sr, 0.1, 0, 1.0, 0.1 );
     }
@@ -64,7 +64,9 @@ class Voice
     
     void setPan( float p )
     {
-      pan = p;
+      // sin / cos based amplitude panning
+      panL = cos(p * 3.14/2.f);
+      panR = sin(p * 3.14/2.f);
     }
     
     void play(int inNote, int vel, int sampleCD)
@@ -123,8 +125,9 @@ class Voice
     
     void process( int nframes, float* bufL, float* bufR )
     {
-	if(banished)
-		return;
+	  if (banished)
+	    return;
+
       // counts down frames until note on
       sampleCountdown--;
       
@@ -134,7 +137,7 @@ class Voice
         // now that we're playing, disable queued flag
         sampleCountdownQueued = false;
       }
-      
+
       if( playingBool && sample )
       {
         // linearly interpolate between samples
@@ -148,11 +151,7 @@ class Voice
         
         // vol is sample gain * midi velocity
         float tmp = out * vol *  adsr->process(nframes);
-        
-        // sin / cos based amplitude panning
-        float panL = cos(pan * 3.14/2.f);
-        float panR = sin(pan * 3.14/2.f);
-        
+
         *bufL += tmp * panL;
         *bufR += tmp * panR;
         
@@ -165,17 +164,17 @@ class Voice
         
         if ( index >= sample->info.frames )
         {
+          //printf("sample '%s' reached end, index=%f\n", sample->path, index);
           index = 0;
           playingBool = false;
         }
         
         if ( adsr->finished() )
         {
+          //printf("sample '%s' reached release end, index=%f\n", sample->path, index);
           // turn off voice if ADSR has finished
           playingBool = false;
         }
-        
-        //return accum * adsr->process(1);
       }
     }
   
@@ -189,11 +188,12 @@ class Voice
     float index;
     
     // counts down frames until note on event
-    bool  sampleCountdownQueued;
-    float sampleCountdown;
+    bool sampleCountdownQueued;
+    int sampleCountdown;
     
     // vol & pan per voice
-    float pan;
+    float panL;
+    float panR;
     float vol;
 };
 
