@@ -146,7 +146,8 @@ static Sample* load_sample(FABLA_DSP* self, const char* path)
   //lv2_log_note(&self->logger, "Loading sample %s\n", path);
   
   Sample* sample = new Sample();
-  SF_INFO* const info    = &sample->info;
+  SF_INFO* const info = &sample->info;
+  info->format = 0;    // This is required by libsndfile API docs!
   SNDFILE* const sndfile = sf_open(path, SFM_READ, info);
   
   if (!sndfile) // || !info->frames ) { // || (info->channels != 1)) {
@@ -162,12 +163,13 @@ static Sample* load_sample(FABLA_DSP* self, const char* path)
   float* data = (float*)malloc(sizeof(float) * info->frames * info->channels );
   if (!data) {
     lv2_log_error(&self->logger, "Failed to allocate memory for sample\n");
+    sf_close(sndfile);
     delete(sample);
     return NULL;
   }
-  
+
   sf_seek(sndfile, 0ul, SEEK_SET);
-  sf_read_float(sndfile, data, info->frames * info->channels);
+  info->frames = sf_readf_float(sndfile, data, info->frames);
   sf_close(sndfile);
   
   int chnls = info->channels;
@@ -187,7 +189,7 @@ static Sample* load_sample(FABLA_DSP* self, const char* path)
     free( data );
     data = tmp;
   }
-  
+
   // Fill sample struct and return it
   sample->data     = data;
   sample->path     = (char*)malloc(path_len + 1);
@@ -429,7 +431,7 @@ static void load_pad_sample(FABLA_DSP* self, int pad, const char* f)
   {
      // TODO: use Worker extension
      newSamp = load_sample(self, f);
-	  //self->schedule->schedule_work(self->schedule->handle, s, &message);
+	 //self->schedule->schedule_work(self->schedule->handle, s, &message);
   }
   else
   {
@@ -446,11 +448,11 @@ static void load_pad_sample(FABLA_DSP* self, int pad, const char* f)
     if ( self->schedule )
     {
       // TODO: use Worker extension
-      free( self->samples[pad]->data );
+      free_sample(self, self->samples[pad]);
     }
     else
     {
-      free( self->samples[pad]->data );
+      free_sample(self, self->samples[pad]);
     }
   }
 
@@ -784,7 +786,7 @@ run(LV2_Handle instance, uint32_t n_samples)
 
   //printf("%f\t%f\t%f\t%f\n", *self->comp_attack, *self->comp_decay, *self->comp_thres, *self->comp_ratio );
   // makeup TODO
-  
+
   for (uint32_t pos = 0; pos < n_samples; pos++)
   {
     float accumL = 0.f;
@@ -794,9 +796,9 @@ run(LV2_Handle instance, uint32_t n_samples)
     {
       self->voice[i]->process( 1, &accumL, &accumR );
     }
-    
-    accumL = accumL * gain;
-    accumR = accumR * gain;
+
+    accumL *= gain;
+    accumR *= gain;
 
     float* buf[2];
     buf[0] = &accumL;
@@ -1047,9 +1049,11 @@ restore(LV2_Handle                  instance,
   size_t   size;
   uint32_t type;
   uint32_t valflags;
+  bool sample_loaded;
   
   for ( int i = 0; i < NPADS; i++ )
   {
+    sample_loaded = false;
     const void* value = retrieve( handle, self->uris->padFilename[i], &size, &type, &valflags);
     if (value)
     {
@@ -1059,31 +1063,25 @@ restore(LV2_Handle                  instance,
       {
         //printf( "Restoring pad %i, filepath: %s\n", i, path);
 
-        if ( self->samples[i] )
-        {
-          free_sample(self, self->samples[i] );
-        }
-
         Sample* newSample = load_sample(self, path);
         if ( newSample )
         {
           self->samples[i] = newSample;
-          
           //printf("Restored sample %s successfully\n", self->samples[i]->path);
           write_pad_fpath(self, i);
+          sample_loaded = true;
         }
         else
         {
           printf("Error: load_sample() return zero on pad %i\n", i);
         }
-        
       } // path is valid
       else
       {
         printf( "Error: path of sample not valid from Restore::retrieve()\n");
       }
     }
-    else
+    if ( !sample_loaded )
     {
       //printf( "Cleaning pad %i\n", i);
       free_pad_sample(self, i);

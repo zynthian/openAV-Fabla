@@ -146,30 +146,36 @@ class Voice
         int x2 = x1 + 1;
         float y1 = sample->data[x1];
         float y2 = sample->data[x2];
-        
+        /*
+        // Data error detection. Not needed because we fix the buffer overflow below ;-)
+        float out;
+        if (isnan(y2)) {
+          out = y1;
+          playingBool = false;
+          printf("NaN when processing frame %d / %ld for sample '%s'\n", x2, sample->info.frames, sample->path);
+        } else {*/
         float out = y1 + ( y2 - y1 ) * x0;
-        
-        // vol is sample gain * midi velocity
-        float tmp = out * vol *  adsr->process(nframes);
 
-        *bufL += tmp * panL;
-        *bufR += tmp * panR;
+        // vol is sample gain * midi velocity
+        out *= vol *  adsr->process(nframes);
+
+        *bufL += out * panL;
+        *bufR += out * panR;
         
         // pitch up twice the range
         float increment = 0.5 + sample->speed;
         if ( increment > 1.0001f )
-          increment = 1.0f + (increment-1.0f)*2;
-        
+          increment = 1.0f + (increment - 1.0f) * 2;
+
         index += increment;
         
-        if ( index >= sample->info.frames )
+        if ( index >= sample->info.frames - 1 )
         {
           //printf("sample '%s' reached end, index=%f\n", sample->path, index);
-          index = 0;
+          //index = 0;
           playingBool = false;
         }
-        
-        if ( adsr->finished() )
+        else if ( adsr->finished() )
         {
           //printf("sample '%s' reached release end, index=%f\n", sample->path, index);
           // turn off voice if ADSR has finished

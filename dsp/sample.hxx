@@ -35,7 +35,7 @@ class Sample
       
       speed = 1.0f;
     }
-    
+
     SF_INFO info;      // Info about sample from sndfile
     float*  data;      // Sample data in float
     char*   path;      // Path of file

@@ -269,6 +269,7 @@ static void port_event(LV2UI_Handle handle,
             //printf("FablaUI:  recieved waveform data on pad %i, path %s\nLoading sample now...\n", pad , f);
 
             SF_INFO info;
+            info.format = 0;    // Required by libsndfile API docs
             SNDFILE* const sndfile = sf_open( f, SFM_READ, &info);
 
             if (!sndfile) // || !info.frames ) { // || (info.channels != 1)) {
@@ -284,7 +285,7 @@ static void port_event(LV2UI_Handle handle,
               break;
             }
             sf_seek(sndfile, 0ul, SEEK_SET);
-            sf_read_float(sndfile, data, info.frames * info.channels);
+            info.frames = sf_readf_float(sndfile, data, info.frames);
 
             int chnls = info.channels;
             if ( chnls > 1 )
