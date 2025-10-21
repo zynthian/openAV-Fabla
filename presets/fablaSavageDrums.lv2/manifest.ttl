@@ -8,5 +8,6 @@
 
 <fablaSavageDrums.ttl>
 	a pset:Preset ;
+	pset:bank <http://www.openavproductions.com/fabla#bank_factory> ;
 	rdfs:seeAlso <fablaSavageDrums.ttl> ;
 	lv2:appliesTo <http://www.openavproductions.com/fabla> .

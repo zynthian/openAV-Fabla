@@ -8,15 +8,7 @@
 
 <fabla808.ttl>
 	a pset:Preset ;
+	pset:bank <http://www.openavproductions.com/fabla#bank_factory> ;
 	rdfs:seeAlso <fabla808.ttl> ;
 	lv2:appliesTo <http://www.openavproductions.com/fabla> .
 
-<fabla808.ttl>
-	a pset:Preset ;
-	rdfs:seeAlso <fabla808.ttl> ;
-	lv2:appliesTo <http://www.openavproductions.com/fabla> .
-
-<fabla808.ttl>
-	a pset:Preset ;
-	rdfs:seeAlso <fabla808.ttl> ;
-	lv2:appliesTo <http://www.openavproductions.com/fabla> .

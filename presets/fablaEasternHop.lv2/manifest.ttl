@@ -8,5 +8,6 @@
 
 <fablaEasternHop.ttl>
 	a pset:Preset ;
+	pset:bank <http://www.openavproductions.com/fabla#bank_factory> ;
 	rdfs:seeAlso <fablaEasternHop.ttl> ;
 	lv2:appliesTo <http://www.openavproductions.com/fabla> .

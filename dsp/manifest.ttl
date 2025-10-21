@@ -1,6 +1,7 @@
 @prefix lv2:  <http://lv2plug.in/ns/lv2core#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix ui:   <http://lv2plug.in/ns/extensions/ui#> .
+@prefix pset: <http://lv2plug.in/ns/ext/presets#> .
 
 <http://www.openavproductions.com/fabla>
   a lv2:Plugin ;
@@ -12,3 +13,8 @@
   ui:binary <fabla.so> ;
   lv2:extensionData ui:idleInterface;
   rdfs:seeAlso <fabla.ttl> .
+
+<http://www.openavproductions.com/fabla#bank_factory>
+  a pset:Bank ;
+  lv2:appliesTo <http://www.openavproductions.com/fabla> ;
+  rdfs:label "Factory" .
