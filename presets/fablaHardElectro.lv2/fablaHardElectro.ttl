@@ -11,6 +11,9 @@
 	lv2:appliesTo <http://www.openavproductions.com/fabla> ;
 	rdfs:label "fablaHardElectro" ;
 	lv2:port [
+		lv2:symbol "base_note" ;
+		pset:value 36.0
+	] , [
 		lv2:symbol "compressor_attack" ;
 		pset:value 0.15000001
 	] , [
